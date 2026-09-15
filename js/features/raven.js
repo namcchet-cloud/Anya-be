@@ -1,6 +1,6 @@
 import { KIVAT_MESH_DATA, KIVAT_META } from './kivat-mesh-data.js?v=1.2';
 
-const VERSION='raven-kivat-v1.3';
+const VERSION='raven-kivat-v1.4';
 const DURATION=8.15;
 let current=null;
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
@@ -70,14 +70,21 @@ function avatarInfo(trigger){const img=trigger?.querySelector?.('.artist-chip-av
 function pose(t,R,target){
   const a=R.aspect,mobile=innerWidth<720;
   const kS=Math.min(mobile?.145:.245,(2*a*(mobile?.76:.62))/4.82,1.28/2.46);
-  const dS=Math.min(mobile?.088:.135,(2*a*.82)/8.81,.74/2.10);
-  const dX=0,dY=mobile?-.03:-.10,[ax,ay]=target;
+  // Keep the Driver visually substantial. Previous patch made the belt feel undersized
+  // next to Kivat, especially on narrow screens.
+  const dS=Math.min(mobile?.102:.155,(2*a*.92)/8.81,.84/2.10);
+  const dX=0,dY=mobile?-.035:-.105,[ax,ay]=target;
   const pcY=KIVAT_META.dockPivot[1]-KIVAT_META.kivatCenter[1];
-  const anchorY=dY+.17;
+  // Contact is geometry-driven: use the actual top of the FBX Driver mesh instead
+  // of a hand-tuned screen offset. A tiny inset removes any visible air gap.
+  const db=KIVAT_MESH_DATA.driver?.bounds;
+  const driverTopLocal=db ? (db.max[1]-KIVAT_META.driverCenter[1]) : 1.04244;
+  const contactInset=mobile?.006:.008;
+  const anchorY=dY+dS*driverTopLocal-contactInset;
   const uprightCenterY=anchorY-kS*pcY;
   let P={driverAlpha:0,driverX:dX,driverY:dY,driverScale:dS,driverRot:0,driverYaw:0,kivatAlpha:0,kx:a+.55,ky:.3,kscale:kS,krot:0,kyaw:0,kpitch:0,dockPitch:0,flap:0,mouth:0,eyeGlow:0};
   if(t>=.48){
-    const u=clamp((t-.48)/.78);P.driverAlpha=easeOut(u);P.driverScale=dS*(.55+.45*easeOut(u));P.driverY=dY+.32*(1-easeOut(u));P.driverYaw=.45*(1-easeOut(u));
+    const u=clamp((t-.48)/.78);P.driverAlpha=easeOut(u);P.driverScale=dS*(.70+.30*easeOut(u));P.driverY=dY+.32*(1-easeOut(u));P.driverYaw=.45*(1-easeOut(u));
   }
   if(t<1.24)return P;
   P.kivatAlpha=1;
@@ -99,7 +106,7 @@ function pose(t,R,target){
     // LAND FIRST: back-facing, upright, feet settle onto the top perch.
     // No inversion happens during the approach itself.
     const u=smooth((t-4.42)/.76);
-    P.kx=dX;P.ky=lerp(uprightCenterY+.11,uprightCenterY,u);
+    P.kx=dX;P.ky=lerp(uprightCenterY+.10,uprightCenterY,u);
     P.krot=0;P.kyaw=Math.PI;P.kpitch=0;
     P.flap=Math.sin((t-4.42)*Math.PI*3)*.12*(1-u);
     P.kscale=kS*(1-.015*u);
