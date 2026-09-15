@@ -1,6 +1,6 @@
-import { KIVAT_MESH_DATA, KIVAT_META } from './kivat-mesh-data.js';
+import { KIVAT_MESH_DATA, KIVAT_META } from './kivat-mesh-data.js?v=1.1';
 
-const VERSION='raven-kivat-v1.0';
+const VERSION='raven-kivat-v1.1';
 const DURATION=8.15;
 let current=null;
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
@@ -33,11 +33,76 @@ class KivatRenderer{
  resize(){const r=this.cv.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);this.cv.width=Math.max(1,Math.round(r.width*d));this.cv.height=Math.max(1,Math.round(r.height*d));this.gl.viewport(0,0,this.cv.width,this.cv.height);this.aspect=r.width/Math.max(1,r.height);this.proj=ortho(-this.aspect,this.aspect,-1,1,-12,12)}
  screen(px,py){const r=this.cv.getBoundingClientRect();return[(px/r.width*2-1)*this.aspect,1-py/r.height*2]}
  drawMesh(name,M,alpha,eye){const g=this.gl,m=this.mesh[name];if(!m||alpha<.002)return;g.useProgram(this.pr);for(const a of ['p','n','k']){const q=m[a];g.bindBuffer(g.ARRAY_BUFFER,q.b);g.enableVertexAttribArray(this.A[a]);g.vertexAttribPointer(this.A[a],q.size,q.type,false,0,0)}g.uniformMatrix4fv(this.U.mvp,false,mul(this.proj,M));g.uniformMatrix3fv(this.U.nm,false,m3(M));g.uniform1f(this.U.eye,eye);g.uniform1f(this.U.alpha,alpha);g.drawArrays(g.TRIANGLES,0,m.count)}
- render(P){const g=this.gl;g.clearColor(0,0,0,0);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);const dc=KIVAT_META.driverCenter,kc=KIVAT_META.kivatCenter;if(P.driverAlpha){const R=comp(tr(P.driverX,P.driverY,.4),rz(P.driverRot||0),ry(P.driverYaw||0),sc(P.driverScale));this.drawMesh('driver',mul(R,tr(-dc[0],-dc[1],-dc[2])),P.driverAlpha,0)}if(P.kivatAlpha){const R=comp(tr(P.kx,P.ky,0),rz(P.krot||0),ry(P.kyaw||0),rx(P.kpitch||0),sc(P.kscale)),C=tr(-kc[0],-kc[1],-kc[2]);this.drawMesh('main',mul(R,C),P.kivatAlpha,P.eyeGlow||0);const mp=KIVAT_META.mouthPivot,Mm=comp(C,tr(mp[0],mp[1],mp[2]),tr(0,-.08*(P.mouth||0),.02*(P.mouth||0)),rx(-.42*(P.mouth||0)),tr(-mp[0],-mp[1],-mp[2]));this.drawMesh('mouth',mul(R,Mm),P.kivatAlpha,P.eyeGlow||0);const l=KIVAT_META.wingPivotL,r=KIVAT_META.wingPivotR,a=P.flap||0;this.drawMesh('wingL',mul(R,comp(C,tr(l[0],l[1],l[2]),rz(a),tr(-l[0],-l[1],-l[2]))),P.kivatAlpha,P.eyeGlow||0);this.drawMesh('wingR',mul(R,comp(C,tr(r[0],r[1],r[2]),rz(-a),tr(-r[0],-r[1],-r[2]))),P.kivatAlpha,P.eyeGlow||0)}}
+ render(P){
+  const g=this.gl;g.clearColor(0,0,0,0);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
+  const dc=KIVAT_META.driverCenter,kc=KIVAT_META.kivatCenter;
+  if(P.driverAlpha){
+    const R=comp(tr(P.driverX,P.driverY,.4),rz(P.driverRot||0),ry(P.driverYaw||0),sc(P.driverScale));
+    this.drawMesh('driver',mul(R,tr(-dc[0],-dc[1],-dc[2])),P.driverAlpha,0)
+  }
+  if(!P.kivatAlpha)return;
+  const C=tr(-kc[0],-kc[1],-kc[2]);
+  const dp=KIVAT_META.dockPivot,pc=[dp[0]-kc[0],dp[1]-kc[1],dp[2]-kc[2]];
+  const H=P.dockRoll?comp(tr(pc[0],pc[1],pc[2]),rz(P.dockRoll),tr(-pc[0],-pc[1],-pc[2])):id();
+  const R=comp(tr(P.kx,P.ky,0),rz(P.krot||0),ry(P.kyaw||0),rx(P.kpitch||0),sc(P.kscale),H);
+  this.drawMesh('main',mul(R,C),P.kivatAlpha,P.eyeGlow||0);
+  const mp=KIVAT_META.mouthPivot;
+  const Mm=comp(C,tr(mp[0],mp[1],mp[2]),tr(0,-.08*(P.mouth||0),.02*(P.mouth||0)),rx(-.42*(P.mouth||0)),tr(-mp[0],-mp[1],-mp[2]));
+  this.drawMesh('mouth',mul(R,Mm),P.kivatAlpha,P.eyeGlow||0);
+  const l=KIVAT_META.wingPivotL,r=KIVAT_META.wingPivotR,a=P.flap||0;
+  const WL=comp(C,tr(l[0],l[1],l[2]),rz(a),tr(-l[0],-l[1],-l[2]));
+  const WR=comp(C,tr(r[0],r[1],r[2]),rz(-a),tr(-r[0],-r[1],-r[2]));
+  // Entire left/right assemblies move together: root + connector + claw + full wing mesh.
+  this.drawMesh('wingRootL',mul(R,WL),P.kivatAlpha,P.eyeGlow||0);
+  this.drawMesh('wingL',mul(R,WL),P.kivatAlpha,P.eyeGlow||0);
+  this.drawMesh('wingRootR',mul(R,WR),P.kivatAlpha,P.eyeGlow||0);
+  this.drawMesh('wingR',mul(R,WR),P.kivatAlpha,P.eyeGlow||0)
+ }
  dispose(){this.ro?.disconnect()}
 }
 
 function avatarInfo(trigger){const img=trigger?.querySelector?.('.artist-chip-avatar img')||trigger?.querySelector?.('img'),box=(img?.parentElement||trigger)?.getBoundingClientRect?.()||{left:innerWidth*.2,top:innerHeight*.35,width:58,height:58};return{src:img?.currentSrc||img?.src||'',rect:{left:box.left,top:box.top,width:box.width,height:box.height}}}
-function pose(t,R,target){const a=R.aspect,mobile=innerWidth<720,kS=Math.min(mobile?.145:.245,(2*a*(mobile?.76:.62))/4.82,1.28/2.46),dS=Math.min(mobile?.088:.135,(2*a*.82)/8.81,.74/2.10),dX=0,dY=mobile?-.03:-.10,[ax,ay]=target;let P={driverAlpha:0,driverX:dX,driverY:dY,driverScale:dS,driverRot:0,driverYaw:0,kivatAlpha:0,kx:a+.55,ky:.3,kscale:kS,krot:0,kyaw:0,kpitch:0,flap:0,mouth:0,eyeGlow:0};if(t>=.48){const u=clamp((t-.48)/.78);P.driverAlpha=easeOut(u);P.driverScale=dS*(.55+.45*easeOut(u));P.driverY=dY+.32*(1-easeOut(u));P.driverYaw=.45*(1-easeOut(u))}if(t>=1.24){P.kivatAlpha=1;const start=[a+.58,.24],bite=[ax+(mobile?.11:.15),ay-.02];if(t<2.48){const u=easeOut(clamp((t-1.24)/1.24));P.kx=lerp(start[0],bite[0],u);P.ky=lerp(start[1],bite[1],u)+Math.sin((t-1.24)*Math.PI*5)*.025;P.krot=lerp(-.24,.035,u);P.kyaw=lerp(-.55,.08,u);P.kscale=kS*(.78+.22*u);P.flap=Math.sin((t-1.24)*Math.PI*8)*.27}else if(t<3.18){const u=(t-2.48)/.70;P.kx=bite[0]-.035*Math.sin(Math.PI*clamp(u));P.ky=bite[1]+.012*Math.sin(u*Math.PI*4);P.krot=.02;P.kyaw=.03;P.flap=Math.sin(t*Math.PI*4)*.09;P.mouth=u<.28?smooth(u/.28):u<.58?1-smooth((u-.28)/.30):0}else if(t<4.52){const u=easeOut(clamp((t-3.18)/1.34)),pre=[dX,dY+.44];P.kx=lerp(bite[0],pre[0],u);P.ky=lerp(bite[1],pre[1],u)+Math.sin((t-3.18)*Math.PI*5)*.018;P.krot=lerp(.05,-.06,u);P.kyaw=lerp(.12,-.08,u);P.flap=Math.sin((t-3.18)*Math.PI*8)*.25*(1-.18*u)}else if(t<5.08){const u=smooth((t-4.52)/.56);P.kx=dX;P.ky=dY+.44-.035*u;P.krot=lerp(-.06,0,u);P.kyaw=lerp(-.08,0,u);P.flap=Math.sin(t*Math.PI*4)*.08*(1-u)}else if(t<5.72){const u=smooth((t-5.08)/.64);P.kx=dX;P.ky=dY+.405-.035*u;P.krot=Math.PI*u;P.kyaw=.02*Math.sin(u*Math.PI)}else{const u=clamp((t-5.72)/.42),q=easeIn(u);P.kx=dX;P.ky=lerp(dY+.37,dY+.055,q);P.krot=Math.PI;P.kscale=kS*(1-.03*q);if(t>=6.12&&t<6.37){const f=(t-6.12)/.25;P.eyeGlow=Math.sin(Math.PI*clamp(f))*1.15;P.ky+=Math.sin((t-6.12)*Math.PI*48)*.006*(1-f)}if(t>=6.37)P.eyeGlow=.12}}return P}
+function pose(t,R,target){
+  const a=R.aspect,mobile=innerWidth<720;
+  const kS=Math.min(mobile?.145:.245,(2*a*(mobile?.76:.62))/4.82,1.28/2.46);
+  const dS=Math.min(mobile?.088:.135,(2*a*.82)/8.81,.74/2.10);
+  const dX=0,dY=mobile?-.03:-.10,[ax,ay]=target;
+  const pcY=KIVAT_META.dockPivot[1]-KIVAT_META.kivatCenter[1];
+  const anchorY=dY+.17;
+  const uprightCenterY=anchorY-kS*pcY;
+  let P={driverAlpha:0,driverX:dX,driverY:dY,driverScale:dS,driverRot:0,driverYaw:0,kivatAlpha:0,kx:a+.55,ky:.3,kscale:kS,krot:0,kyaw:0,kpitch:0,dockRoll:0,flap:0,mouth:0,eyeGlow:0};
+  if(t>=.48){
+    const u=clamp((t-.48)/.78);P.driverAlpha=easeOut(u);P.driverScale=dS*(.55+.45*easeOut(u));P.driverY=dY+.32*(1-easeOut(u));P.driverYaw=.45*(1-easeOut(u));
+  }
+  if(t<1.24)return P;
+  P.kivatAlpha=1;
+  const start=[a+.58,.24],bite=[ax+(mobile?.11:.15),ay-.02];
+  if(t<2.48){
+    const u=easeOut(clamp((t-1.24)/1.24));P.kx=lerp(start[0],bite[0],u);P.ky=lerp(start[1],bite[1],u)+Math.sin((t-1.24)*Math.PI*5)*.025;P.krot=lerp(-.24,.035,u);P.kyaw=lerp(-.55,.08,u);P.kscale=kS*(.78+.22*u);P.flap=Math.sin((t-1.24)*Math.PI*7.2)*.31;
+  }else if(t<3.18){
+    const u=(t-2.48)/.70;P.kx=bite[0]-.035*Math.sin(Math.PI*clamp(u));P.ky=bite[1]+.012*Math.sin(u*Math.PI*4);P.krot=.02;P.kyaw=.03;P.flap=Math.sin(t*Math.PI*3.5)*.10;P.mouth=u<.28?smooth(u/.28):u<.58?1-smooth((u-.28)/.30):0;
+  }else if(t<4.42){
+    const u=easeOut(clamp((t-3.18)/1.24));P.kx=lerp(bite[0],dX,u);P.ky=lerp(bite[1],uprightCenterY+.10,u)+Math.sin((t-3.18)*Math.PI*4.8)*.016;P.krot=lerp(.05,0,u);P.kyaw=lerp(.12,0,u);P.flap=Math.sin((t-3.18)*Math.PI*7.2)*.28*(1-.25*u);
+  }else if(t<5.18){
+    // LAND FIRST: face remains upright and front-facing while feet settle onto the Driver perch.
+    const u=smooth((t-4.42)/.76);P.kx=dX;P.ky=lerp(uprightCenterY+.10,uprightCenterY,u);P.krot=0;P.kyaw=0;P.flap=Math.sin((t-4.42)*Math.PI*3)*.12*(1-u);P.kscale=kS*(1-.015*u);
+  }else if(t<5.34){
+    // brief readable hold after landing
+    P.kx=dX;P.ky=uprightCenterY;P.krot=0;P.flap=0;
+  }else if(t<6.12){
+    // Heavy hinge action: rotate the whole Kivat around its perched feet, not around its head/centre.
+    const u=clamp((t-5.34)/.78);
+    const q=smooth(u);
+    P.kx=dX;P.ky=uprightCenterY;P.krot=0;P.flap=0;P.dockRoll=Math.PI*q;
+    // tiny resistance before the final latch
+    if(u>.84)P.ky+=.006*Math.sin((u-.84)/.16*Math.PI);
+  }else{
+    P.kx=dX;P.ky=uprightCenterY;P.dockRoll=Math.PI;P.flap=0;
+    const slam=clamp((t-6.12)/.12);P.ky+=.014*(1-slam);
+    if(t>=6.12&&t<6.37){const f=(t-6.12)/.25;P.eyeGlow=Math.sin(Math.PI*clamp(f))*1.15;P.ky+=Math.sin((t-6.12)*Math.PI*44)*.004*(1-f)}
+    if(t>=6.37)P.eyeGlow=.10;
+  }
+  return P
+}
 
-export function initRaven(){const chain=new URL('../../assets/easter/raven-chain.png',import.meta.url).href;const api={preload:()=>Promise.resolve(true),launch(trigger){api.stop('replaced');const info=avatarInfo(trigger),host=document.createElement('div');host.style.cssText='position:fixed;inset:0;z-index:2147482000;';const shadow=host.attachShadow({mode:'open'});shadow.innerHTML=`<style>${CSS}</style>${html(chain,info.src,info.rect)}`;document.body.append(host);const layer=shadow.querySelector('.layer'),canvas=shadow.querySelector('canvas'),av=shadow.querySelector('.avatar'),chains=shadow.querySelector('.chains'),shards=shadow.querySelector('.shards'),impact=shadow.querySelector('.impact'),flash=shadow.querySelector('.flash'),R=new KivatRenderer(canvas),prev=document.body.style.overflow;document.body.style.overflow='hidden';const center=[info.rect.left+info.rect.width/2,info.rect.top+info.rect.height/2],target=R.screen(...center),state={host,trigger,renderer:R,prev,raf:0};current=state;shadow.querySelector('[data-skip]')?.addEventListener('click',()=>api.stop('skipped'));let start=performance.now(),last='';const phase=t=>t<.48?'dark':t<1.24?'driver':t<2.48?'fly':t<3.18?'bite':t<4.52?'return':t<5.08?'align':t<5.72?'flip':t<6.12?'dock':t<6.37?'flash':t<7.18?'chain':t<7.52?'tight':t<7.88?'break':'exit';const loop=now=>{if(current!==state)return;const t=(now-start)/1000,p=phase(t);if(p!==last){last=p;if(p==='bite')av.classList.add('bitten');if(p==='flash'){impact.classList.add('go');flash.classList.add('go')}if(p==='chain')chains.classList.add('lock');if(p==='tight')chains.classList.add('tight');if(p==='break'){chains.classList.add('break');shards.classList.add('go')}if(p==='exit')layer.classList.add('exit')}R.render(pose(t,R,target));if(t<DURATION)state.raf=requestAnimationFrame(loop);else api.stop('complete')};state.raf=requestAnimationFrame(loop);document.dispatchEvent(new CustomEvent('club:raven',{detail:{active:true,duration:DURATION,version:VERSION,renderer:'user-fbx-webgl'}}));return true},stop(reason='cancelled'){if(!current)return;const s=current;current=null;cancelAnimationFrame(s.raf);s.renderer?.dispose();try{s.host.remove()}catch{}document.body.style.overflow=s.prev||'';if(reason!=='complete'&&reason!=='hidden')s.trigger?.focus?.({preventScroll:true});document.dispatchEvent(new CustomEvent('club:raven',{detail:{active:false,reason,version:VERSION}}))},get state(){return{active:!!current,duration:DURATION,version:VERSION,renderer:'user-fbx-webgl',lastError:''}}};window.ClubRaven=api;if(!window.__kivatEscapeBound){window.__kivatEscapeBound=true;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&current){e.preventDefault();api.stop('escape')}});document.addEventListener('visibilitychange',()=>{if(document.hidden)api.stop('hidden')});window.addEventListener('pagehide',()=>api.stop('hidden'))}return api}
+export function initRaven(){const chain=new URL('../../assets/easter/raven-chain.png',import.meta.url).href;const api={preload:()=>Promise.resolve(true),launch(trigger){api.stop('replaced');const info=avatarInfo(trigger),host=document.createElement('div');host.style.cssText='position:fixed;inset:0;z-index:2147482000;';const shadow=host.attachShadow({mode:'open'});shadow.innerHTML=`<style>${CSS}</style>${html(chain,info.src,info.rect)}`;document.body.append(host);const layer=shadow.querySelector('.layer'),canvas=shadow.querySelector('canvas'),av=shadow.querySelector('.avatar'),chains=shadow.querySelector('.chains'),shards=shadow.querySelector('.shards'),impact=shadow.querySelector('.impact'),flash=shadow.querySelector('.flash'),R=new KivatRenderer(canvas),prev=document.body.style.overflow;document.body.style.overflow='hidden';const center=[info.rect.left+info.rect.width/2,info.rect.top+info.rect.height/2],target=R.screen(...center),state={host,trigger,renderer:R,prev,raf:0};current=state;shadow.querySelector('[data-skip]')?.addEventListener('click',()=>api.stop('skipped'));let start=performance.now(),last='';const phase=t=>t<.48?'dark':t<1.24?'driver':t<2.48?'fly':t<3.18?'bite':t<4.42?'return':t<5.18?'land':t<5.34?'hold':t<6.12?'hinge':t<6.37?'flash':t<7.18?'chain':t<7.52?'tight':t<7.88?'break':'exit';const loop=now=>{if(current!==state)return;const t=(now-start)/1000,p=phase(t);if(p!==last){last=p;if(p==='bite')av.classList.add('bitten');if(p==='flash'){impact.classList.add('go');flash.classList.add('go')}if(p==='chain')chains.classList.add('lock');if(p==='tight')chains.classList.add('tight');if(p==='break'){chains.classList.add('break');shards.classList.add('go')}if(p==='exit')layer.classList.add('exit')}R.render(pose(t,R,target));if(t<DURATION)state.raf=requestAnimationFrame(loop);else api.stop('complete')};state.raf=requestAnimationFrame(loop);document.dispatchEvent(new CustomEvent('club:raven',{detail:{active:true,duration:DURATION,version:VERSION,renderer:'user-fbx-webgl'}}));return true},stop(reason='cancelled'){if(!current)return;const s=current;current=null;cancelAnimationFrame(s.raf);s.renderer?.dispose();try{s.host.remove()}catch{}document.body.style.overflow=s.prev||'';if(reason!=='complete'&&reason!=='hidden')s.trigger?.focus?.({preventScroll:true});document.dispatchEvent(new CustomEvent('club:raven',{detail:{active:false,reason,version:VERSION}}))},get state(){return{active:!!current,duration:DURATION,version:VERSION,renderer:'user-fbx-webgl',lastError:''}}};window.ClubRaven=api;if(!window.__kivatEscapeBound){window.__kivatEscapeBound=true;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&current){e.preventDefault();api.stop('escape')}});document.addEventListener('visibilitychange',()=>{if(document.hidden)api.stop('hidden')});window.addEventListener('pagehide',()=>api.stop('hidden'))}return api}
