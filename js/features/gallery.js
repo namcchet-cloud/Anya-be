@@ -1,6 +1,6 @@
-import { local, t, apply } from '../core/i18n.js?v=6.3.0';
-import { setImage, imageVariant } from '../core/images.js?v=6.3.0';
-import { start, loadCSS, report } from '../core/runtime.js?v=6.3.0';
+import { local, t, apply } from '../core/i18n.js?v=6.2.0';
+import { setImage, imageVariant } from '../core/images.js?v=6.2.0';
+import { start, loadCSS, report } from '../core/runtime.js?v=6.2.0';
 
 /** Author/gallery state is independent of visual effects and of the music player. */
 export function initGallery(content) {
@@ -21,7 +21,7 @@ export function initGallery(content) {
   const artName = art => local(art.title).trim() || `${local(art.author)} · ${local(art.description)}`;
   const visible = () => artworks.map((art, index) => ({ art, index }))
     .filter(({ art }) => (!artistId || art.artistId === artistId) && (filter === 'all' || art.category === filter));
-  const effectsCSS = new URL('../../css/effects.css?v=6.3.0', import.meta.url).href;
+  const effectsCSS = new URL('../../css/effects.css?v=6.2.0', import.meta.url).href;
   const RAVEN_POSTER_SVG = `
 <svg viewBox="0 0 1000 440" role="img" aria-label="Vector transformation driver">
   <defs><linearGradient id="rp-n" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2d3850"/><stop offset="1" stop-color="#0b1120"/></linearGradient><linearGradient id="rp-r" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff5147"/><stop offset="1" stop-color="#99020b"/></linearGradient></defs>
@@ -43,7 +43,7 @@ export function initGallery(content) {
       ? Promise.resolve() : loadCSS(effectsCSS)
   ).catch(error => { cssReady = null; throw error; });
   const ensureRaven = () => start('raven', async () => {
-    const url = new URL('./raven.js?v=6.2.1', import.meta.url);
+    const url = new URL('./raven.js?v=kivat-1.0', import.meta.url);
     // Retry only after a failed import, not on every page view.
     if (ravenImportAttempt) url.searchParams.set('retry', String(ravenImportAttempt));
     try { return (await import(url.href)).initRaven(); }
@@ -94,7 +94,7 @@ export function initGallery(content) {
       if (rev !== effectRevision || artistId !== selected) return;
       const btn = switcher.querySelector(`[data-artist="${selected}"]`);
       if (selected === 'akiko-oishi' && replay && motion?.enabled) {
-        const akiko = await start('akiko', async () => (await import('./akiko.js?v=6.3.0')).initAkiko());
+        const akiko = await start('akiko', async () => (await import('./akiko.js?v=6.2.0')).initAkiko());
         if (rev === effectRevision && artistId === selected) await akiko.launch(btn);
       }
       if (selected === 'raven-lin' && replay) {
@@ -178,7 +178,7 @@ export function initGallery(content) {
         const replay = make('button', 'raven-replay', en ? '▷ Replay transformation' : '▷ Biến hình lại');
         replay.type = 'button'; replay.dataset.ravenReplay = 'true';
         replay.setAttribute('aria-describedby', 'raven-motion-note raven-launch-status');
-        const badge = make('small', 'raven-build-badge', 'KIVAT EASTER EGG / DEMO 0.1');
+        const badge = make('small', 'raven-build-badge', 'KIVAT BELT / EASTER EGG 1.0');
         const motionNote = make('p', 'raven-motion-note');
         motionNote.id = 'raven-motion-note'; motionNote.dataset.ravenMotionNote = '';
         const status = make('p', 'raven-launch-status');
@@ -186,9 +186,14 @@ export function initGallery(content) {
         status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.hidden = true;
         copy.append(badge, replay, motionNote, status);
         const figure = make('figure', 'raven-empty-driver');
-        const driver = make('div', 'raven-kivat-poster');
-        driver.innerHTML = `<img class="raven-kivat-poster-belt" src="assets/easter/kiva-belt.png" alt=""><img class="raven-kivat-poster-kivat" src="assets/easter/kivat-full.png" alt="">`;
-        figure.append(driver, make('figcaption', '', 'KIVAT BELT / SECRET EASTER EGG / RAVEN LIN'));
+        const driver = make('div', 'raven-vector-poster');
+        const kivatPoster = make('img', '');
+        kivatPoster.src = 'assets/easter/kivat-preview.png';
+        kivatPoster.alt = 'Kivat Belt';
+        kivatPoster.loading = 'lazy';
+        kivatPoster.style.cssText = 'display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 14px 20px #0008)';
+        driver.replaceChildren(kivatPoster);
+        figure.append(driver, make('figcaption', '', 'KIVAT BELT / RAVEN LIN EASTER EGG'));
         placeholder.append(copy, figure); fragment.append(placeholder);
       } else {
         const placeholder = make('article', 'gallery-card placeholder-card');
